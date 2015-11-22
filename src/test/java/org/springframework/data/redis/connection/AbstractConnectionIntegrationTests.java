@@ -111,7 +111,9 @@ public abstract class AbstractConnectionIntegrationTests {
 	@After
 	public void tearDown() {
 		try {
-			connection.flushDb();
+
+			// since we use more than one db we're required to flush them all
+			connection.flushAll();
 		} catch (Exception e) {
 			// Connection may be closed in certain cases, like after pub/sub
 			// tests
@@ -1975,6 +1977,27 @@ public abstract class AbstractConnectionIntegrationTests {
 		}
 
 		assertThat(i, is(itemCount));
+	}
+
+	/**
+	 * @see DATAREDIS-417
+	 */
+	@Test
+	@IfProfileValue(name = "redisVersion", value = "2.8+")
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void scanShouldReadEntireValueRangeWhenIdividualScanIterationsReturnEmptyCollection() {
+
+		connection.execute("DEBUG", "POPULATE".getBytes(), "100".getBytes());
+
+		Cursor<byte[]> cursor = connection.scan(ScanOptions.scanOptions().match("key*9").count(10).build());
+
+		int i = 0;
+		while (cursor.hasNext()) {
+			assertThat(new String(cursor.next()), containsString("key:"));
+			i++;
+		}
+
+		assertThat(i, is(10));
 	}
 
 	/**
