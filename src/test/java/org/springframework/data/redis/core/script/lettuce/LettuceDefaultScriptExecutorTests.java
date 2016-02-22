@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 the original author or authors.
+ * Copyright 2014-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.junit.Before;
 import org.springframework.data.redis.SettingsUtils;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceTestClientResources;
 import org.springframework.data.redis.core.script.AbstractDefaultScriptExecutorTests;
 import org.springframework.data.redis.core.script.DefaultScriptExecutor;
 
@@ -27,6 +28,7 @@ import org.springframework.data.redis.core.script.DefaultScriptExecutor;
  * Integration test of {@link DefaultScriptExecutor} with Lettuce.
  * 
  * @author Thomas Darimont
+ * @author Mark Paluch
  */
 public class LettuceDefaultScriptExecutorTests extends AbstractDefaultScriptExecutorTests {
 
@@ -36,6 +38,8 @@ public class LettuceDefaultScriptExecutorTests extends AbstractDefaultScriptExec
 	public void setup() {
 
 		connectionFactory = new LettuceConnectionFactory(SettingsUtils.getHost(), SettingsUtils.getPort());
+		connectionFactory.setClientResources(LettuceTestClientResources.getSharedClientResources());
+		connectionFactory.setShutdownTimeout(0);
 		connectionFactory.afterPropertiesSet();
 	}
 

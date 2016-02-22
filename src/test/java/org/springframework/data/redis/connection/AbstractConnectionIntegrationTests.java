@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2015 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.springframework.data.redis.connection;
 
 import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.number.IsCloseTo.*;
 import static org.junit.Assert.*;
 import static org.junit.Assume.*;
 import static org.springframework.data.redis.SpinBarrier.*;
@@ -34,6 +35,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,6 +54,7 @@ import org.springframework.data.redis.RedisVersionUtils;
 import org.springframework.data.redis.TestCondition;
 import org.springframework.data.redis.connection.RedisListCommands.Position;
 import org.springframework.data.redis.connection.RedisStringCommands.BitOperation;
+import org.springframework.data.redis.connection.RedisStringCommands.SetOption;
 import org.springframework.data.redis.connection.RedisZSetCommands.Aggregate;
 import org.springframework.data.redis.connection.RedisZSetCommands.Range;
 import org.springframework.data.redis.connection.RedisZSetCommands.Tuple;
@@ -60,6 +63,7 @@ import org.springframework.data.redis.connection.StringRedisConnection.StringTup
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.data.redis.core.types.RedisClientInfo;
 import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
@@ -77,6 +81,7 @@ import org.springframework.test.annotation.ProfileValueSourceConfiguration;
  * @author Jennifer Hickey
  * @author Christoph Strobl
  * @author Thomas Darimont
+ * @author Mark Paluch
  */
 @ProfileValueSourceConfiguration(RedisTestProfileValueSource.class)
 public abstract class AbstractConnectionIntegrationTests {
@@ -340,10 +345,12 @@ public abstract class AbstractConnectionIntegrationTests {
 		assumeTrue(RedisVersionUtils.atLeast("2.6", byteConnection));
 		initConnection();
 		final AtomicBoolean scriptDead = new AtomicBoolean(false);
+		final CountDownLatch sync = new CountDownLatch(1);
 		Thread th = new Thread(new Runnable() {
 			public void run() {
 				DefaultStringRedisConnection conn2 = new DefaultStringRedisConnection(connectionFactory.getConnection());
 				try {
+					sync.countDown();
 					conn2.eval("local time=1 while time < 10000000000 do time=time+1 end", ReturnType.BOOLEAN, 0);
 				} catch (DataAccessException e) {
 					scriptDead.set(true);
@@ -352,7 +359,8 @@ public abstract class AbstractConnectionIntegrationTests {
 			}
 		});
 		th.start();
-		Thread.sleep(1000);
+		sync.await(2, TimeUnit.SECONDS);
+		Thread.sleep(200);
 		connection.scriptKill();
 		getResults();
 		assertTrue(waitFor(new TestCondition() {
@@ -377,11 +385,10 @@ public abstract class AbstractConnectionIntegrationTests {
 	@IfProfileValue(name = "runLongTests", value = "true")
 	public void testPersist() throws Exception {
 		connection.set("exp3", "true");
-		actual.add(connection.expire("exp3", 1));
+		actual.add(connection.expire("exp3", 30));
 		actual.add(connection.persist("exp3"));
-		Thread.sleep(1500);
-		actual.add(connection.exists("exp3"));
-		verifyResults(Arrays.asList(new Object[] { true, true, true }));
+		actual.add(connection.ttl("exp3"));
+		verifyResults(Arrays.asList(new Object[] { true, true, -1L }));
 	}
 
 	@Test
@@ -411,7 +418,6 @@ public abstract class AbstractConnectionIntegrationTests {
 	@IfProfileValue(name = "runLongTests", value = "true")
 	public void testBRPopTimeout() throws Exception {
 		actual.add(connection.bRPop(1, "alist"));
-		Thread.sleep(1500l);
 		verifyResults(Arrays.asList(new Object[] { null }));
 	}
 
@@ -419,7 +425,6 @@ public abstract class AbstractConnectionIntegrationTests {
 	@IfProfileValue(name = "runLongTests", value = "true")
 	public void testBLPopTimeout() throws Exception {
 		actual.add(connection.bLPop(1, "alist"));
-		Thread.sleep(1500l);
 		verifyResults(Arrays.asList(new Object[] { null }));
 	}
 
@@ -427,7 +432,6 @@ public abstract class AbstractConnectionIntegrationTests {
 	@IfProfileValue(name = "runLongTests", value = "true")
 	public void testBRPopLPushTimeout() throws Exception {
 		actual.add(connection.bRPopLPush(1, "alist", "foo"));
-		Thread.sleep(1500l);
 		verifyResults(Arrays.asList(new Object[] { null }));
 	}
 
@@ -630,12 +634,16 @@ public abstract class AbstractConnectionIntegrationTests {
 
 		Thread th = new Thread(new Runnable() {
 			public void run() {
-				// sleep 1/2 second to let the registration happen
+				// sync to let the registration happen
+				waitFor(new TestCondition() {
+					@Override
+					public boolean passes() {
+						return connection.isSubscribed();
+					}
+				}, 2000);
 				try {
 					Thread.sleep(500);
-				} catch (InterruptedException ex) {
-					throw new RuntimeException(ex);
-				}
+				} catch (InterruptedException o_O) {}
 
 				// open a new connection
 				RedisConnection connection2 = connectionFactory.getConnection();
@@ -678,12 +686,17 @@ public abstract class AbstractConnectionIntegrationTests {
 
 		Thread th = new Thread(new Runnable() {
 			public void run() {
-				// sleep 1/2 second to let the registration happen
+				// sync to let the registration happen
+				waitFor(new TestCondition() {
+					@Override
+					public boolean passes() {
+						return connection.isSubscribed();
+					}
+				}, 2000);
+
 				try {
 					Thread.sleep(500);
-				} catch (InterruptedException ex) {
-					throw new RuntimeException(ex);
-				}
+				} catch (InterruptedException o_O) {}
 
 				// open a new connection
 				RedisConnection connection2 = connectionFactory.getConnection();
@@ -1004,7 +1017,7 @@ public abstract class AbstractConnectionIntegrationTests {
 		actual.add(connection.get("testing"));
 		connection.restore("testing".getBytes(), 100l, (byte[]) results.get(0));
 		verifyResults(Arrays.asList(new Object[] { 1l, null }));
-		assertTrue(waitFor(new KeyExpired("testing"), 300l));
+		assertTrue(waitFor(new KeyExpired("testing"), 400l));
 	}
 
 	@Test
@@ -2218,6 +2231,282 @@ public abstract class AbstractConnectionIntegrationTests {
 		values = (Set<String>) results.get(10);
 		assertThat(values, hasItems("e", "f", "g"));
 		assertThat(values, not(hasItems("a", "b", "c", "d")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndNullOpionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "foo", Expiration.milliseconds(500), null);
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(500d, 499d)));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndUpsertOpionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "foo", Expiration.milliseconds(500), SetOption.upsert());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(500d, 499d)));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndUpsertOpionShouldSetTtlWhenKeyDoesExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "spring");
+		connection.set(key, "data", Expiration.milliseconds(500), SetOption.upsert());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(500d, 499d)));
+		assertThat(((String) result.get(2)), is(equalTo("data")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndAbsentOptionShouldSetTtlWhenKeyDoesExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "spring");
+		connection.set(key, "data", Expiration.milliseconds(500), SetOption.ifAbsent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+		assertThat(((String) result.get(2)), is(equalTo("spring")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndAbsentOptionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "data", Expiration.milliseconds(500), SetOption.ifAbsent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(500d, 499d)));
+		assertThat(((String) result.get(2)), is(equalTo("data")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndPresentOptionShouldSetTtlWhenKeyDoesExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "spring");
+		connection.set(key, "data", Expiration.milliseconds(500), SetOption.ifPresent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(500, 499)));
+		assertThat(((String) result.get(2)), is(equalTo("data")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithExpirationAndPresentOptionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "data", Expiration.milliseconds(500), SetOption.ifPresent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.FALSE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-2, 0)));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithNullExpirationAndUpsertOpionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "foo", null, SetOption.upsert());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithoutExpirationAndUpsertOpionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "foo", Expiration.persistent(), SetOption.upsert());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithoutExpirationAndUpsertOpionShouldSetTtlWhenKeyDoesExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "spring");
+		connection.set(key, "data", Expiration.persistent(), SetOption.upsert());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+		assertThat(((String) result.get(2)), is(equalTo("data")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithoutExpirationAndAbsentOptionShouldSetTtlWhenKeyDoesExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "spring");
+		connection.set(key, "data", Expiration.persistent(), SetOption.ifAbsent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+		assertThat(((String) result.get(2)), is(equalTo("spring")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithoutExpirationAndAbsentOptionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "data", Expiration.persistent(), SetOption.ifAbsent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+		assertThat(((String) result.get(2)), is(equalTo("data")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithoutExpirationAndPresentOptionShouldSetTtlWhenKeyDoesExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "spring");
+		connection.set(key, "data", Expiration.persistent(), SetOption.ifPresent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.TRUE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-1, 0)));
+		assertThat(((String) result.get(2)), is(equalTo("data")));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	@WithRedisDriver({ RedisDriver.JEDIS, RedisDriver.LETTUCE })
+	public void setWithoutExpirationAndPresentOptionShouldSetTtlWhenKeyDoesNotExist() {
+
+		String key = "exp-" + UUID.randomUUID();
+		connection.set(key, "data", Expiration.persistent(), SetOption.ifPresent());
+
+		actual.add(connection.exists(key));
+		actual.add(connection.pTtl(key));
+		actual.add(connection.get(key));
+
+		List<Object> result = getResults();
+		assertThat((Boolean) result.get(0), is(Boolean.FALSE));
+		assertThat(((Long) result.get(1)).doubleValue(), is(closeTo(-2, 0)));
 	}
 
 	protected void verifyResults(List<Object> expected) {

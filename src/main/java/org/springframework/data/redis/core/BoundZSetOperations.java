@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2014 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package org.springframework.data.redis.core;
 import java.util.Collection;
 import java.util.Set;
 
+import org.springframework.data.redis.connection.RedisZSetCommands.Limit;
+import org.springframework.data.redis.connection.RedisZSetCommands.Range;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 
 /**
@@ -26,6 +28,7 @@ import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
  * 
  * @author Costin Leau
  * @author Christoph Strobl
+ * @author Mark Paluch
  */
 public interface BoundZSetOperations<K, V> extends BoundKeyOperations<K> {
 
@@ -50,6 +53,27 @@ public interface BoundZSetOperations<K, V> extends BoundKeyOperations<K> {
 	Set<TypedTuple<V>> reverseRangeWithScores(long start, long end);
 
 	Set<TypedTuple<V>> reverseRangeByScoreWithScores(double min, double max);
+
+	/**
+	 * Get all elements with lexicographical ordering with a value between {@link Range#getMin()} and
+	 * {@link Range#getMax()}.
+	 * 
+	 * @param range must not be {@literal null}.
+	 * @since 1.7
+	 */
+	Set<V> rangeByLex(Range range);
+
+	/**
+	 * Get all elements {@literal n} elements, where {@literal n = } {@link Limit#getCount()}, starting at
+	 * {@link Limit#getOffset()} with lexicographical ordering having a value between {@link Range#getMin()} and
+	 * {@link Range#getMax()}.
+	 * 
+	 * @param range must not be {@literal null}.
+	 * @param limit can be {@literal null}.
+	 * @return
+	 * @since 1.7
+	 */
+	Set<V> rangeByLex(Range range, Limit limit);
 
 	void removeRange(long start, long end);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.Pool;
+import org.springframework.data.redis.connection.RedisClusterConnection;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisSentinelConnection;
@@ -37,7 +38,9 @@ import org.springframework.util.StringUtils;
  * 
  * @author Costin Leau
  * @author Jennifer Hickey
+ * @deprecated since 1.7. Will be removed in subsequent version.
  */
+@Deprecated
 public class JredisConnectionFactory implements InitializingBean, DisposableBean, RedisConnectionFactory {
 
 	private ConnectionSpec connectionSpec;
@@ -103,6 +106,15 @@ public class JredisConnectionFactory implements InitializingBean, DisposableBean
 			connection = new JredisConnection(new JRedisClient(connectionSpec), null);
 		}
 		return postProcessConnection(connection);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisConnectionFactory#getClusterConnection()
+	 */
+	@Override
+	public RedisClusterConnection getClusterConnection() {
+		throw new UnsupportedOperationException("Jredis does not support Redis Cluster.");
 	}
 
 	/**

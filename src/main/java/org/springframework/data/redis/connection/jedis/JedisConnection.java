@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2015 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ import org.springframework.data.redis.core.KeyBoundCursor;
 import org.springframework.data.redis.core.ScanCursor;
 import org.springframework.data.redis.core.ScanIteration;
 import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.data.redis.core.types.RedisClientInfo;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
@@ -1136,6 +1137,87 @@ public class JedisConnection extends AbstractRedisConnection {
 			jedis.set(key, value);
 		} catch (Exception ex) {
 			throw convertJedisAccessException(ex);
+		}
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisStringCommands#set(byte[], byte[], org.springframework.data.redis.core.types.Expiration, org.springframework.data.redis.connection.RedisStringCommands.SetOption)
+	 */
+	@Override
+	public void set(byte[] key, byte[] value, Expiration expiration, SetOption option) {
+
+		if (expiration == null || expiration.isPersistent()) {
+
+			if (option == null || ObjectUtils.nullSafeEquals(SetOption.UPSERT, option)) {
+				set(key, value);
+			} else {
+
+				try {
+
+					byte[] nxxx = JedisConverters.toSetCommandNxXxArgument(option);
+
+					if (isPipelined()) {
+
+						pipeline(new JedisStatusResult(pipeline.set(key, value, nxxx)));
+						return;
+					}
+					if (isQueueing()) {
+
+						transaction(new JedisStatusResult(transaction.set(key, value, nxxx)));
+						return;
+					}
+
+					jedis.set(key, value, nxxx);
+				} catch (Exception ex) {
+					throw convertJedisAccessException(ex);
+				}
+			}
+
+		} else {
+
+			if (option == null || ObjectUtils.nullSafeEquals(SetOption.UPSERT, option)) {
+
+				if (ObjectUtils.nullSafeEquals(TimeUnit.MILLISECONDS, expiration.getTimeUnit())) {
+					pSetEx(key, expiration.getExpirationTime(), value);
+				} else {
+					setEx(key, expiration.getExpirationTime(), value);
+				}
+			} else {
+
+				byte[] nxxx = JedisConverters.toSetCommandNxXxArgument(option);
+				byte[] expx = JedisConverters.toSetCommandExPxArgument(expiration);
+
+				try {
+					if (isPipelined()) {
+
+						if (expiration.getExpirationTime() > Integer.MAX_VALUE) {
+
+							throw new IllegalArgumentException(
+									"Expiration.expirationTime must be less than Integer.MAX_VALUE for pipeline in Jedis.");
+						}
+
+						pipeline(new JedisStatusResult(pipeline.set(key, value, nxxx, expx, (int) expiration.getExpirationTime())));
+						return;
+					}
+					if (isQueueing()) {
+
+						if (expiration.getExpirationTime() > Integer.MAX_VALUE) {
+							throw new IllegalArgumentException(
+									"Expiration.expirationTime must be less than Integer.MAX_VALUE for transactions in Jedis.");
+						}
+
+						transaction(new JedisStatusResult(transaction.set(key, value, nxxx, expx,
+								(int) expiration.getExpirationTime())));
+						return;
+					}
+
+					jedis.set(key, value, nxxx, expx, expiration.getExpirationTime());
+
+				} catch (Exception ex) {
+					throw convertJedisAccessException(ex);
+				}
+			}
 		}
 	}
 
@@ -3536,6 +3618,43 @@ public class JedisConnection extends AbstractRedisConnection {
 		} catch (Exception ex) {
 			throw convertJedisAccessException(ex);
 		}
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisServerCommands#migrate(byte[], org.springframework.data.redis.connection.RedisNode, int, org.springframework.data.redis.connection.RedisServerCommands.MigrateOption)
+	 */
+	@Override
+	public void migrate(byte[] key, RedisNode target, int dbIndex, MigrateOption option) {
+		migrate(key, target, dbIndex, option, Long.MAX_VALUE);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisServerCommands#migrate(byte[], org.springframework.data.redis.connection.RedisNode, int, org.springframework.data.redis.connection.RedisServerCommands.MigrateOption, long)
+	 */
+	@Override
+	public void migrate(byte[] key, RedisNode target, int dbIndex, MigrateOption option, long timeout) {
+
+		final int timeoutToUse = timeout <= Integer.MAX_VALUE ? (int) timeout : Integer.MAX_VALUE;
+
+		try {
+			if (isPipelined()) {
+
+				pipeline(new JedisResult(pipeline.migrate(JedisConverters.toBytes(target.getHost()), target.getPort(), key,
+						dbIndex, timeoutToUse)));
+				return;
+			}
+			if (isQueueing()) {
+				transaction(new JedisResult(transaction.migrate(JedisConverters.toBytes(target.getHost()), target.getPort(),
+						key, dbIndex, timeoutToUse)));
+				return;
+			}
+			jedis.migrate(JedisConverters.toBytes(target.getHost()), target.getPort(), key, dbIndex, timeoutToUse);
+		} catch (Exception ex) {
+			throw convertJedisAccessException(ex);
+		}
+
 	}
 
 }

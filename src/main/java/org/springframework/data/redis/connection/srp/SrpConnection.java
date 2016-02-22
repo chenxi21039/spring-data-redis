@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2015 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ import org.springframework.data.redis.connection.AbstractRedisConnection;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.connection.FutureResult;
 import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.connection.RedisNode;
 import org.springframework.data.redis.connection.RedisPipelineException;
 import org.springframework.data.redis.connection.RedisSubscribedConnectionException;
 import org.springframework.data.redis.connection.ReturnType;
@@ -45,6 +46,7 @@ import org.springframework.data.redis.connection.SortParameters;
 import org.springframework.data.redis.connection.Subscription;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.data.redis.core.types.RedisClientInfo;
 import org.springframework.util.Assert;
 
@@ -69,7 +71,9 @@ import com.google.common.util.concurrent.ListenableFuture;
  * @author Christoph Strobl
  * @author Thomas Darimont
  * @author David Liu
+ * @deprecated since 1.7. Will be removed in subsequent version.
  */
+@Deprecated
 public class SrpConnection extends AbstractRedisConnection {
 
 	private static final ExceptionTranslationStrategy EXCEPTION_TRANSLATION = new FallbackExceptionTranslationStrategy(
@@ -870,6 +874,16 @@ public class SrpConnection extends AbstractRedisConnection {
 		} catch (Exception ex) {
 			throw convertSrpAccessException(ex);
 		}
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisStringCommands#set(byte[], byte[], org.springframework.data.redis.core.types.Expiration, org.springframework.data.redis.connection.RedisStringCommands.SetOption)
+	 */
+	@Override
+	public void set(byte[] key, byte[] value, Expiration expiration, SetOption option) {
+		throw new UnsupportedOperationException(
+				"SET with options is not supported for Srp. Please use SETNX, SETEX, PSETEX.");
 	}
 
 	public byte[] getSet(byte[] key, byte[] value) {
@@ -2619,6 +2633,24 @@ public class SrpConnection extends AbstractRedisConnection {
 	@Override
 	public Set<byte[]> zRangeByLex(byte[] key, Range range, Limit limit) {
 		throw new UnsupportedOperationException("ZRANGEBYLEX is no supported for srp.");
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisServerCommands#migrate(byte[], org.springframework.data.redis.connection.RedisNode, int, org.springframework.data.redis.connection.RedisServerCommands.MigrateOption)
+	 */
+	@Override
+	public void migrate(byte[] key, RedisNode target, int dbIndex, MigrateOption option) {
+		throw new UnsupportedOperationException();
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisServerCommands#migrate(byte[], org.springframework.data.redis.connection.RedisNode, int, org.springframework.data.redis.connection.RedisServerCommands.MigrateOption, long)
+	 */
+	@Override
+	public void migrate(byte[] key, RedisNode target, int dbIndex, MigrateOption option, long timeout) {
+		throw new UnsupportedOperationException();
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2014 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,14 @@ package org.springframework.data.redis.connection;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.redis.core.types.Expiration;
+
 /**
  * String/Value-specific commands supported by Redis.
  * 
  * @author Costin Leau
  * @author Christoph Strobl
+ * @author Mark Paluch
  */
 public interface RedisStringCommands {
 
@@ -35,7 +38,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/get
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @return
 	 */
 	byte[] get(byte[] key);
@@ -45,7 +48,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/getset
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param value
 	 * @return
 	 */
@@ -66,18 +69,32 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/set
 	 * 
-	 * @param key
-	 * @param value
+	 * @param key must not be {@literal null}.
+	 * @param value must not be {@literal null}.
 	 */
 	void set(byte[] key, byte[] value);
+
+	/**
+	 * Set {@code value} for {@code key} applying timeouts from {@code expiration} if set and inserting/updating values
+	 * depending on {@code option}.
+	 * <p>
+	 * See http://redis.io/commands/set
+	 *
+	 * @param key must not be {@literal null}.
+	 * @param value must not be {@literal null}.
+	 * @param expiration can be {@literal null}. Defaulted to {@link Expiration#persistent()}.
+	 * @param option can be {@literal null}. Defaulted to {@link SetOption#UPSERT}.
+	 * @since 1.7
+	 */
+	void set(byte[] key, byte[] value, Expiration expiration, SetOption option);
 
 	/**
 	 * Set {@code value} for {@code key}, only if {@code key} does not exist.
 	 * <p>
 	 * See http://redis.io/commands/setnx
 	 * 
-	 * @param key
-	 * @param value
+	 * @param key must not be {@literal null}.
+	 * @param value must not be {@literal null}.
 	 * @return
 	 */
 	Boolean setNX(byte[] key, byte[] value);
@@ -87,9 +104,9 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/setex
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param seconds
-	 * @param value
+	 * @param value must not be {@literal null}.
 	 */
 	void setEx(byte[] key, long seconds, byte[] value);
 
@@ -98,9 +115,9 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/psetex
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param milliseconds
-	 * @param value
+	 * @param value must not be {@literal null}.
 	 * @since 1.3
 	 */
 	void pSetEx(byte[] key, long milliseconds, byte[] value);
@@ -129,7 +146,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/incr
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @return
 	 */
 	Long incr(byte[] key);
@@ -139,7 +156,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/incrby
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param value
 	 * @return
 	 */
@@ -150,7 +167,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/incrbyfloat
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param value
 	 * @return
 	 */
@@ -161,7 +178,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/decr
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @return
 	 */
 	Long decr(byte[] key);
@@ -171,7 +188,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/decrby
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param value
 	 * @return
 	 */
@@ -182,7 +199,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/append
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param value
 	 * @return
 	 */
@@ -193,7 +210,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/getrange
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param begin
 	 * @param end
 	 * @return
@@ -205,7 +222,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/setrange
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param value
 	 * @param offset
 	 */
@@ -216,7 +233,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/getbit
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param offset
 	 * @return
 	 */
@@ -227,7 +244,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/setbit
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param offset
 	 * @param value
 	 * @return the original bit value stored at {@code offset}.
@@ -239,7 +256,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/bitcount
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @return
 	 */
 	Long bitCount(byte[] key);
@@ -250,7 +267,7 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/bitcount
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @param begin
 	 * @param end
 	 * @return
@@ -274,8 +291,65 @@ public interface RedisStringCommands {
 	 * <p>
 	 * See http://redis.io/commands/strlen
 	 * 
-	 * @param key
+	 * @param key must not be {@literal null}.
 	 * @return
 	 */
 	Long strLen(byte[] key);
+
+	/**
+	 * {@code SET} command arguments for {@code NX}, {@code XX}.
+	 * 
+	 * @author Christoph Strobl
+	 * @since 1.7
+	 */
+	public static enum SetOption {
+
+		/**
+		 * Do not set any additional command argument.
+		 * 
+		 * @return
+		 */
+		UPSERT,
+
+		/**
+		 * {@code NX}
+		 * 
+		 * @return
+		 */
+		SET_IF_ABSENT,
+
+		/**
+		 * {@code XX}
+		 * 
+		 * @return
+		 */
+		SET_IF_PRESENT;
+
+		/**
+		 * Do not set any additional command argument.
+		 * 
+		 * @return
+		 */
+		public static SetOption upsert() {
+			return UPSERT;
+		}
+
+		/**
+		 * {@code XX}
+		 * 
+		 * @return
+		 */
+		public static SetOption ifPresent() {
+			return SET_IF_PRESENT;
+		}
+
+		/**
+		 * {@code NX}
+		 * 
+		 * @return
+		 */
+		public static SetOption ifAbsent() {
+			return SET_IF_ABSENT;
+		}
+	}
 }

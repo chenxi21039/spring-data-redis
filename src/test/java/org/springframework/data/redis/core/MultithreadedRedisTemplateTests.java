@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 the original author or authors.
+ * Copyright 2014-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,18 +23,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.springframework.data.redis.ConnectionFactoryTracker;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceTestClientResources;
 import org.springframework.data.redis.connection.srp.SrpConnectionFactory;
 
 /**
  * @author Artem Bilian
  * @author Christoph Strobl
+ * @author Mark Paluch
  */
 @RunWith(Parameterized.class)
 public class MultithreadedRedisTemplateTests {
@@ -43,6 +47,12 @@ public class MultithreadedRedisTemplateTests {
 
 	public MultithreadedRedisTemplateTests(RedisConnectionFactory factory) {
 		this.factory = factory;
+		ConnectionFactoryTracker.add(factory);
+	}
+
+	@AfterClass
+	public static void cleanUp() {
+		ConnectionFactoryTracker.cleanUp();
 	}
 
 	@Parameters
@@ -53,11 +63,12 @@ public class MultithreadedRedisTemplateTests {
 		jedis.afterPropertiesSet();
 
 		LettuceConnectionFactory lettuce = new LettuceConnectionFactory();
+		lettuce.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		lettuce.setPort(6379);
 		lettuce.afterPropertiesSet();
 
 		SrpConnectionFactory srp = new SrpConnectionFactory();
-		srp.setPort(6479);
+		srp.setPort(6379);
 		srp.afterPropertiesSet();
 
 		return Arrays.asList(new Object[][] { { jedis }, { lettuce }, { srp } });

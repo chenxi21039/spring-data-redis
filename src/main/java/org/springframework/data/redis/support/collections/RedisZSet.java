@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,9 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedSet;
 
+import org.springframework.data.redis.connection.RedisZSetCommands.Limit;
+import org.springframework.data.redis.connection.RedisZSetCommands.Range;
+import org.springframework.data.redis.core.BoundZSetOperations;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 
 /**
@@ -31,6 +34,8 @@ import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
  * Since using a {@link Comparator} does not apply, a ZSet implements the {@link SortedSet} methods where applicable.
  * 
  * @author Costin Leau
+ * @author Mark Paluch
+ * @auhtor Christoph Strobl
  */
 public interface RedisZSet<E> extends RedisCollection<E>, Set<E> {
 
@@ -45,6 +50,30 @@ public interface RedisZSet<E> extends RedisCollection<E>, Set<E> {
 	Set<E> range(long start, long end);
 
 	Set<E> reverseRange(long start, long end);
+
+	/**
+	 * Get all elements with lexicographical ordering with a value between {@link Range#getMin()} and
+	 * {@link Range#getMax()}.
+	 * 
+	 * @param range must not be {@literal null}.
+	 * @return
+	 * @see BoundZSetOperations#rangeByLex(Range)
+	 * @since 1.7
+	 */
+	Set<E> rangeByLex(Range range);
+
+	/**
+	 * Get all elements {@literal n} elements, where {@literal n = } {@link Limit#getCount()}, starting at
+	 * {@link Limit#getOffset()} with lexicographical ordering having a value between {@link Range#getMin()} and
+	 * {@link Range#getMax()}.
+	 * 
+	 * @param range must not be {@literal null}.
+	 * @param limit can be {@literal null}.
+	 * @return
+	 * @see BoundZSetOperations#rangeByLex(Range, Limit)
+	 * @since 1.7
+	 */
+	Set<E> rangeByLex(Range range, Limit limit);
 
 	Set<E> rangeByScore(double min, double max);
 

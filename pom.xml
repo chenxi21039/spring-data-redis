@@ -1,13 +1,11 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.springframework.data</groupId>
 	<artifactId>spring-data-redis</artifactId>
-	<version>1.7.0.DATAREDIS-419-SNAPSHOT</version>
+	<version>1.7.0.BUILD-SNAPSHOT</version>
 
 	<name>Spring Data Redis</name>
 
@@ -22,12 +20,13 @@
 		<springdata.commons>1.12.0.BUILD-SNAPSHOT</springdata.commons>
 		<jta>1.1</jta>
 		<beanutils>1.9.2</beanutils>
-		<xstream>1.4.4</xstream>
+		<xstream>1.4.8</xstream>
 		<pool>2.2</pool>
-		<lettuce>3.3.Final</lettuce>
-		<jedis>2.7.3</jedis>
+		<lettuce>3.4.1.Final</lettuce>
+		<jedis>2.8.0</jedis>
 		<srp>0.7</srp>
 		<jredis>06052013</jredis>
+		<multithreadedtc>1.01</multithreadedtc>
 	</properties>
 
 	<dependencyManagement>
@@ -179,6 +178,13 @@
 			<groupId>com.thoughtworks.xstream</groupId>
 			<artifactId>xstream</artifactId>
 			<version>${xstream}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>edu.umd.cs.mtc</groupId>
+			<artifactId>multithreadedtc</artifactId>
+			<version>${multithreadedtc}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

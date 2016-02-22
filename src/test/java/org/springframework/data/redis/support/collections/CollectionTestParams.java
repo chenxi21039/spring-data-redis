@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2014 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.data.redis.support.collections;
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.springframework.data.redis.DoubleAsStringObjectFactory;
 import org.springframework.data.redis.ObjectFactory;
 import org.springframework.data.redis.Person;
 import org.springframework.data.redis.PersonObjectFactory;
@@ -28,6 +29,7 @@ import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.connection.jredis.JredisConnectionFactory;
 import org.springframework.data.redis.connection.jredis.JredisPool;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceTestClientResources;
 import org.springframework.data.redis.connection.srp.SrpConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -40,6 +42,7 @@ import org.springframework.oxm.xstream.XStreamMarshaller;
 /**
  * @author Costin Leau
  * @author Thomas Darimont
+ * @author Mark Paluch
  */
 public abstract class CollectionTestParams {
 
@@ -58,6 +61,7 @@ public abstract class CollectionTestParams {
 
 		// create Jedis Factory
 		ObjectFactory<String> stringFactory = new StringObjectFactory();
+		ObjectFactory<String> doubleAsStringObjectFactory = new DoubleAsStringObjectFactory();
 		ObjectFactory<Person> personFactory = new PersonObjectFactory();
 		ObjectFactory<byte[]> rawFactory = new RawObjectFactory();
 
@@ -177,6 +181,7 @@ public abstract class CollectionTestParams {
 
 		// Lettuce
 		LettuceConnectionFactory lettuceConnFactory = new LettuceConnectionFactory();
+		lettuceConnFactory.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		lettuceConnFactory.setPort(SettingsUtils.getPort());
 		lettuceConnFactory.setHostName(SettingsUtils.getHost());
 		lettuceConnFactory.afterPropertiesSet();
@@ -214,6 +219,7 @@ public abstract class CollectionTestParams {
 
 		return Arrays.asList(new Object[][] {
 				{ stringFactory, stringTemplate },
+				{ doubleAsStringObjectFactory, stringTemplate },
 				{ personFactory, personTemplate },
 				{ stringFactory, xstreamStringTemplate },
 				{ personFactory, xstreamPersonTemplate },
@@ -229,7 +235,8 @@ public abstract class CollectionTestParams {
 				{ personFactory, jackson2JsonPersonTemplateJR },
 				{ rawFactory, rawTemplateJR },
 				// srp
-				{ stringFactory, stringTemplateSRP }, { personFactory, personTemplateSRP },
+				{ stringFactory, stringTemplateSRP },
+				{ personFactory, personTemplateSRP },
 				{ stringFactory, xstreamStringTemplateSRP },
 				{ personFactory, xstreamPersonTemplateSRP },
 				{ personFactory, jsonPersonTemplateSRP },
@@ -237,6 +244,7 @@ public abstract class CollectionTestParams {
 				{ rawFactory, rawTemplateSRP },
 				// lettuce
 				{ stringFactory, stringTemplateLtc }, { personFactory, personTemplateLtc },
+				{ doubleAsStringObjectFactory, stringTemplateLtc }, { personFactory, personTemplateLtc },
 				{ stringFactory, xstreamStringTemplateLtc }, { personFactory, xstreamPersonTemplateLtc },
 				{ personFactory, jsonPersonTemplateLtc }, { personFactory, jackson2JsonPersonTemplateLtc },
 				{ rawFactory, rawTemplateLtc } });

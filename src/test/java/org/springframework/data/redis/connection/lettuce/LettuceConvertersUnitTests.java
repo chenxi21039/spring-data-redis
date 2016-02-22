@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 the original author or authors.
+ * Copyright 2014-2015 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,31 @@
  */
 package org.springframework.data.redis.connection.lettuce;
 
+import static org.hamcrest.core.Is.*;
+import static org.hamcrest.core.IsCollectionContaining.*;
 import static org.hamcrest.core.IsEqual.*;
+import static org.hamcrest.core.IsNull.*;
 import static org.junit.Assert.*;
+import static org.springframework.data.redis.connection.ClusterTestVariables.*;
+import static org.springframework.test.util.ReflectionTestUtils.*;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 
 import org.junit.Test;
+import org.springframework.data.redis.connection.RedisClusterNode;
+import org.springframework.data.redis.connection.RedisClusterNode.Flag;
+import org.springframework.data.redis.connection.RedisClusterNode.LinkState;
+import org.springframework.data.redis.connection.RedisStringCommands.SetOption;
+import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.data.redis.core.types.RedisClientInfo;
+
+import com.lambdaworks.redis.RedisURI;
+import com.lambdaworks.redis.cluster.models.partitions.Partitions;
+import com.lambdaworks.redis.cluster.models.partitions.RedisClusterNode.NodeFlag;
+import com.lambdaworks.redis.protocol.SetArgs;
 
 /**
  * @author Christoph Strobl
@@ -61,4 +79,138 @@ public class LettuceConvertersUnitTests {
 		assertThat(LettuceConverters.toListOfRedisClientInformation(sb.toString()).size(), equalTo(2));
 	}
 
+	/**
+	 * @see DATAREDIS-315
+	 */
+	@Test
+	public void partitionsToClusterNodesShouldReturnEmptyCollectionWhenPartionsDoesNotContainElements() {
+		assertThat(LettuceConverters.partitionsToClusterNodes(new Partitions()), notNullValue());
+	}
+
+	/**
+	 * @see DATAREDIS-315
+	 */
+	@Test
+	public void partitionsToClusterNodesShouldConvertPartitionCorrctly() {
+
+		Partitions partitions = new Partitions();
+
+		com.lambdaworks.redis.cluster.models.partitions.RedisClusterNode partition = new com.lambdaworks.redis.cluster.models.partitions.RedisClusterNode();
+		partition.setNodeId(CLUSTER_NODE_1.getId());
+		partition.setConnected(true);
+		partition.setFlags(new HashSet<NodeFlag>(Arrays.asList(NodeFlag.MASTER, NodeFlag.MYSELF)));
+		partition.setUri(RedisURI.create("redis://" + CLUSTER_HOST + ":" + MASTER_NODE_1_PORT));
+		partition.setSlots(Arrays.<Integer> asList(1, 2, 3, 4, 5));
+
+		partitions.addPartition(partition);
+
+		List<RedisClusterNode> nodes = LettuceConverters.partitionsToClusterNodes(partitions);
+		assertThat(nodes.size(), is(1));
+
+		RedisClusterNode node = nodes.get(0);
+		assertThat(node.getHost(), is(CLUSTER_HOST));
+		assertThat(node.getPort(), is(MASTER_NODE_1_PORT));
+		assertThat(node.getFlags(), hasItems(Flag.MASTER, Flag.MYSELF));
+		assertThat(node.getId(), is(CLUSTER_NODE_1.getId()));
+		assertThat(node.getLinkState(), is(LinkState.CONNECTED));
+		assertThat(node.getSlotRange().getSlots(), hasItems(1, 2, 3, 4, 5));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldReturnEmptyArgsForNullValues() {
+
+		SetArgs args = LettuceConverters.toSetArgs(null, null);
+
+		assertThat(getField(args, "ex"), is(nullValue()));
+		assertThat(getField(args, "px"), is(nullValue()));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.FALSE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.FALSE));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldNotSetExOrPxForPersistent() {
+
+		SetArgs args = LettuceConverters.toSetArgs(Expiration.persistent(), null);
+
+		assertThat(getField(args, "ex"), is(nullValue()));
+		assertThat(getField(args, "px"), is(nullValue()));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.FALSE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.FALSE));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldSetExForSeconds() {
+
+		SetArgs args = LettuceConverters.toSetArgs(Expiration.seconds(10), null);
+
+		assertThat((Long) getField(args, "ex"), is(10L));
+		assertThat(getField(args, "px"), is(nullValue()));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.FALSE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.FALSE));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldSetPxForMilliseconds() {
+
+		SetArgs args = LettuceConverters.toSetArgs(Expiration.milliseconds(100), null);
+
+		assertThat(getField(args, "ex"), is(nullValue()));
+		assertThat((Long) getField(args, "px"), is(100L));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.FALSE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.FALSE));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldSetNxForAbsent() {
+
+		SetArgs args = LettuceConverters.toSetArgs(null, SetOption.ifAbsent());
+
+		assertThat(getField(args, "ex"), is(nullValue()));
+		assertThat(getField(args, "px"), is(nullValue()));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.TRUE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.FALSE));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldSetXxForPresent() {
+
+		SetArgs args = LettuceConverters.toSetArgs(null, SetOption.ifPresent());
+
+		assertThat(getField(args, "ex"), is(nullValue()));
+		assertThat(getField(args, "px"), is(nullValue()));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.FALSE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.TRUE));
+	}
+
+	/**
+	 * @see DATAREDIS-316
+	 */
+	@Test
+	public void toSetArgsShouldNotSetNxOrXxForUpsert() {
+
+		SetArgs args = LettuceConverters.toSetArgs(null, SetOption.upsert());
+
+		assertThat(getField(args, "ex"), is(nullValue()));
+		assertThat(getField(args, "px"), is(nullValue()));
+		assertThat((Boolean) getField(args, "nx"), is(Boolean.FALSE));
+		assertThat((Boolean) getField(args, "xx"), is(Boolean.FALSE));
+	}
 }

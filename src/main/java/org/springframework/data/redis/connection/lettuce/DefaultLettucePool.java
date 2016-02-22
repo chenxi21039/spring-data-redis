@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2015 the original author or authors.
+ * Copyright 2013-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import org.springframework.util.Assert;
 import com.lambdaworks.redis.RedisAsyncConnection;
 import com.lambdaworks.redis.RedisClient;
 import com.lambdaworks.redis.RedisURI;
+import com.lambdaworks.redis.resource.ClientResources;
 
 /**
  * Default implementation of {@link LettucePool}.
@@ -40,7 +41,7 @@ import com.lambdaworks.redis.RedisURI;
  */
 public class DefaultLettucePool implements LettucePool, InitializingBean {
 
-	@SuppressWarnings("rawtypes")//
+	@SuppressWarnings("rawtypes") //
 	private GenericObjectPool<RedisAsyncConnection> internalPool;
 	private RedisClient client;
 	private int dbIndex = 0;
@@ -50,6 +51,7 @@ public class DefaultLettucePool implements LettucePool, InitializingBean {
 	private String password;
 	private long timeout = TimeUnit.MILLISECONDS.convert(60, TimeUnit.SECONDS);
 	private RedisSentinelConfiguration sentinelConfiguration;
+	private ClientResources clientResources;
 
 	/**
 	 * Constructs a new <code>DefaultLettucePool</code> instance with default settings.
@@ -101,7 +103,13 @@ public class DefaultLettucePool implements LettucePool, InitializingBean {
 
 	@SuppressWarnings({ "rawtypes" })
 	public void afterPropertiesSet() {
-		this.client = new RedisClient(getRedisURI());
+
+		if (clientResources != null) {
+			this.client = RedisClient.create(clientResources, getRedisURI());
+		} else {
+			this.client = RedisClient.create(getRedisURI());
+		}
+
 		client.setDefaultTimeout(timeout, TimeUnit.MILLISECONDS);
 		this.internalPool = new GenericObjectPool<RedisAsyncConnection>(new LettuceFactory(client, dbIndex), poolConfig);
 	}
@@ -271,6 +279,27 @@ public class DefaultLettucePool implements LettucePool, InitializingBean {
 	 */
 	public void setTimeout(long timeout) {
 		this.timeout = timeout;
+	}
+
+	/**
+	 * Get the {@link ClientResources} to reuse infrastructure.
+	 * 
+	 * @return {@literal null} if not set.
+	 * @since 1.7
+	 */
+	public ClientResources getClientResources() {
+		return clientResources;
+	}
+
+	/**
+	 * Sets the {@link ClientResources} to reuse the client infrastructure. <br />
+	 * Set to {@literal null} to not share resources.
+	 * 
+	 * @param clientResources can be {@literal null}.
+	 * @since 1.7
+	 */
+	public void setClientResources(ClientResources clientResources) {
+		this.clientResources = clientResources;
 	}
 
 	@SuppressWarnings("rawtypes")

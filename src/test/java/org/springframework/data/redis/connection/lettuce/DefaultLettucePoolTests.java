@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2014 the original author or authors.
+ * Copyright 2013-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 package org.springframework.data.redis.connection.lettuce;
 
 import static org.junit.Assert.*;
+
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.junit.After;
@@ -34,6 +36,7 @@ import com.lambdaworks.redis.RedisException;
  * @author Jennifer Hickey
  * @author Thomas Darimont
  * @author Christoph Strobl
+ * @author Mark Paluch
  */
 public class DefaultLettucePoolTests {
 
@@ -44,7 +47,7 @@ public class DefaultLettucePoolTests {
 		if (this.pool != null) {
 
 			if (this.pool.getClient() != null) {
-				this.pool.getClient().shutdown();
+				this.pool.getClient().shutdown(0, 0, TimeUnit.MILLISECONDS);
 			}
 
 			this.pool.destroy();
@@ -54,6 +57,7 @@ public class DefaultLettucePoolTests {
 	@Test
 	public void testGetResource() {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.afterPropertiesSet();
 		RedisAsyncConnection<byte[], byte[]> client = pool.getResource();
 		assertNotNull(client);
@@ -67,6 +71,7 @@ public class DefaultLettucePoolTests {
 		poolConfig.setMaxTotal(1);
 		poolConfig.setMaxWaitMillis(1);
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort(), poolConfig);
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.afterPropertiesSet();
 		RedisAsyncConnection<byte[], byte[]> client = pool.getResource();
 		assertNotNull(client);
@@ -83,6 +88,7 @@ public class DefaultLettucePoolTests {
 		PoolConfig poolConfig = new PoolConfig();
 		poolConfig.setTestOnBorrow(true);
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort(), poolConfig);
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.afterPropertiesSet();
 		RedisAsyncConnection<byte[], byte[]> client = pool.getResource();
 		assertNotNull(client);
@@ -92,6 +98,7 @@ public class DefaultLettucePoolTests {
 	@Test(expected = PoolException.class)
 	public void testGetResourceCreationUnsuccessful() throws Exception {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), 3333);
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.afterPropertiesSet();
 		pool.getResource();
 	}
@@ -102,6 +109,7 @@ public class DefaultLettucePoolTests {
 		poolConfig.setMaxTotal(1);
 		poolConfig.setMaxWaitMillis(1);
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort(), poolConfig);
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.afterPropertiesSet();
 		RedisAsyncConnection<byte[], byte[]> client = pool.getResource();
 		assertNotNull(client);
@@ -116,6 +124,7 @@ public class DefaultLettucePoolTests {
 		poolConfig.setMaxTotal(1);
 		poolConfig.setMaxWaitMillis(1);
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort(), poolConfig);
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.afterPropertiesSet();
 		RedisAsyncConnection<byte[], byte[]> client = pool.getResource();
 		assertNotNull(client);
@@ -134,6 +143,7 @@ public class DefaultLettucePoolTests {
 	@Test
 	public void testCreateWithDbIndex() {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.setDatabase(1);
 		pool.afterPropertiesSet();
 		assertNotNull(pool.getResource());
@@ -142,6 +152,7 @@ public class DefaultLettucePoolTests {
 	@Test(expected = PoolException.class)
 	public void testCreateWithDbIndexInvalid() {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.setDatabase(17);
 		pool.afterPropertiesSet();
 		pool.getResource();
@@ -150,6 +161,7 @@ public class DefaultLettucePoolTests {
 	@Test(expected = PoolException.class)
 	public void testCreateWithPasswordNoPassword() {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.setPassword("notthepassword");
 		pool.afterPropertiesSet();
 		pool.getResource();
@@ -159,6 +171,7 @@ public class DefaultLettucePoolTests {
 	@Test
 	public void testCreatePassword() {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.setPassword("foo");
 		pool.afterPropertiesSet();
 		RedisAsyncConnection<byte[], byte[]> conn = pool.getResource();
@@ -170,8 +183,21 @@ public class DefaultLettucePoolTests {
 	@Test(expected = PoolException.class)
 	public void testCreateInvalidPassword() {
 		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		this.pool.setClientResources(LettuceTestClientResources.getSharedClientResources());
 		pool.setPassword("bad");
 		pool.afterPropertiesSet();
 		pool.getResource();
+	}
+
+	/**
+	 * @see DATAREDIS-462
+	 */
+	@Test
+	public void poolWorksWithoutClientResources() {
+
+		this.pool = new DefaultLettucePool(SettingsUtils.getHost(), SettingsUtils.getPort());
+		pool.setDatabase(1);
+		pool.afterPropertiesSet();
+		assertNotNull(pool.getResource());
 	}
 }

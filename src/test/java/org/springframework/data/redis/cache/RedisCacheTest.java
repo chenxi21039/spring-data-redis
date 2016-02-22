@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2014 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.data.redis.cache;
 
+import static edu.umd.cs.mtc.TestFramework.*;
 import static org.hamcrest.core.IsEqual.*;
 import static org.hamcrest.core.IsInstanceOf.*;
 import static org.hamcrest.core.IsNot.*;
@@ -26,6 +27,7 @@ import static org.junit.Assume.*;
 import static org.springframework.data.redis.matcher.RedisTestMatchers.*;
 
 import java.util.Collection;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,13 +42,17 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.Cache.ValueWrapper;
 import org.springframework.data.redis.ConnectionFactoryTracker;
 import org.springframework.data.redis.ObjectFactory;
+import org.springframework.data.redis.StringObjectFactory;
 import org.springframework.data.redis.core.AbstractOperationsTestParams;
 import org.springframework.data.redis.core.RedisTemplate;
+
+import edu.umd.cs.mtc.MultithreadedTestCase;
 
 /**
  * @author Costin Leau
  * @author Jennifer Hickey
  * @author Christoph Strobl
+ * @author Mark Paluch
  */
 @SuppressWarnings("rawtypes")
 @RunWith(Parameterized.class)
@@ -273,5 +279,67 @@ public class RedisCacheTest extends AbstractNativeCacheTest<RedisTemplate> {
 		}
 
 		assertThat(wrapper.get(), equalTo(value));
+	}
+
+	/**
+	 * @see DATAREDIS-443
+	 * @see DATAREDIS-452
+	 */
+	@Test
+	public void testCacheGetSynchronized() throws Throwable {
+
+		assumeThat(cache, instanceOf(RedisCache.class));
+		assumeThat(valueFactory, instanceOf(StringObjectFactory.class));
+
+		runOnce(new CacheGetWithValueLoaderIsThreadSafe((RedisCache) cache));
+	}
+
+	@SuppressWarnings("unused")
+	private static class CacheGetWithValueLoaderIsThreadSafe extends MultithreadedTestCase {
+
+		RedisCache redisCache;
+		TestCacheLoader<String> cacheLoader;
+
+		public CacheGetWithValueLoaderIsThreadSafe(RedisCache redisCache) {
+
+			this.redisCache = redisCache;
+
+			cacheLoader = new TestCacheLoader<String>("test") {
+
+				@Override
+				public String call() throws Exception {
+
+					waitForTick(2);
+					return super.call();
+				}
+			};
+		}
+
+		public void thread1() {
+
+			assertTick(0);
+			assertThat(redisCache.get("key", cacheLoader), equalTo("test"));
+		}
+
+		public void thread2() {
+
+			waitForTick(1);
+			assertThat(redisCache.get("key", new TestCacheLoader<String>("illegal value")), equalTo("test"));
+			assertTick(2);
+		}
+	}
+
+	private static class TestCacheLoader<T> implements Callable<T> {
+
+		private final T value;
+
+		public TestCacheLoader(T value) {
+			this.value = value;
+		}
+
+		@Override
+		public T call() throws Exception {
+			return value;
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2015 the original author or authors.
+ * Copyright 2011-2016 the original author or authors.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import org.springframework.data.redis.connection.convert.SetConverter;
 import org.springframework.data.redis.core.ConvertingCursor;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.data.redis.core.types.RedisClientInfo;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -728,6 +729,15 @@ public class DefaultStringRedisConnection implements StringRedisConnection {
 
 	public void set(byte[] key, byte[] value) {
 		delegate.set(key, value);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisStringCommands#set(byte[], byte[], org.springframework.data.redis.core.types.Expiration, org.springframework.data.redis.connection.RedisStringCommands.SetOptions)
+	 */
+	@Override
+	public void set(byte[] key, byte[] value, Expiration expiration, SetOption option) {
+		delegate.set(key, value, expiration, option);
 	}
 
 	public Boolean setBit(byte[] key, long offset, boolean value) {
@@ -1860,6 +1870,14 @@ public class DefaultStringRedisConnection implements StringRedisConnection {
 		delegate.set(serialize(key), serialize(value));
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.StringRedisConnection#set(java.lang.String, java.lang.String, org.springframework.data.redis.core.types.Expiration, org.springframework.data.redis.connection.RedisStringCommands.SetOptions)
+	 */
+	public void set(String key, String value, Expiration expiration, SetOption option) {
+		set(serialize(key), serialize(value), expiration, option);
+	}
+
 	public Boolean setBit(String key, long offset, boolean value) {
 		return delegate.setBit(serialize(key), offset, value);
 	}
@@ -2686,6 +2704,24 @@ public class DefaultStringRedisConnection implements StringRedisConnection {
 			addResultConverter(byteSetToStringSet);
 		}
 		return byteSetToStringSet.convert(results);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisServerCommands#migrate(byte[], org.springframework.data.redis.connection.RedisNode, int, org.springframework.data.redis.connection.RedisServerCommands.MigrateOption)
+	 */
+	@Override
+	public void migrate(byte[] key, RedisNode target, int dbIndex, MigrateOption option) {
+		delegate.migrate(key, target, dbIndex, option);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.redis.connection.RedisServerCommands#migrate(byte[], org.springframework.data.redis.connection.RedisNode, int, org.springframework.data.redis.connection.RedisServerCommands.MigrateOption, long)
+	 */
+	@Override
+	public void migrate(byte[] key, RedisNode target, int dbIndex, MigrateOption option, long timeout) {
+		delegate.migrate(key, target, dbIndex, option, timeout);
 	}
 
 }

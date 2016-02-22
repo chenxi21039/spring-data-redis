@@ -12,7 +12,7 @@ Spring Data Redis provides easy configuration and access to Redis from Spring ap
 [[redis:requirements]]
 == Redis Requirements
 
-Spring Redis requires Redis 2.6 or above and Java SE 6.0 or above . In terms of language bindings (or connectors), Spring Redis integrates with http://github.com/xetorthio/jedis[Jedis], http://github.com/alphazero/jredis[JRedis], http://github.com/spullara/redis-protocol[SRP] and http://github.com/wg/lettuce[Lettuce], four popular open source Java libraries for Redis. If you are aware of any other connector that we should be integrating with please send us feedback.
+Spring Redis requires Redis 2.6 or above and Java SE 6.0 or above . In terms of language bindings (or connectors), Spring Redis integrates with http://github.com/xetorthio/jedis[Jedis], http://github.com/alphazero/jredis[JRedis] (Deprecated since 1.7), http://github.com/spullara/redis-protocol[SRP] (Deprecated since 1.7) and http://github.com/wg/lettuce[Lettuce], four popular open source Java libraries for Redis. If you are aware of any other connector that we should be integrating with please send us feedback.
 
 [[redis:architecture]]
 == Redis Support High Level View
@@ -76,7 +76,7 @@ For production use however, one might want to tweak the settings such as the hos
 ----
 
 [[redis:connectors:jredis]]
-=== Configuring JRedis connector
+=== Configuring JRedis connector (Deprecated since 1.7)
 
 http://github.com/alphazero/jredis[JRedis] is another popular, open-source connector supported by Spring Data Redis through the `org.springframework.data.redis.connection.jredis` package.
 
@@ -117,7 +117,7 @@ The configuration is quite similar to Jedis, with one notable exception. By defa
 ----
 
 [[redis:connectors:srp]]
-=== Configuring SRP connector
+=== Configuring SRP connector (Deprecated since 1.7)
 
 https://github.com/spullara/redis-protocol[SRP] (an acronym for Sam's Redis Protocol) is the third open-source connector supported by Spring Data Redis through the `org.springframework.data.redis.connection.srp` package.
 
@@ -344,7 +344,7 @@ public void useCallback() {
 [[redis:serializer]]
 == Serializers
 
-From the framework perspective, the data stored in Redis is just bytes. While Redis itself supports various types, for the most part these refer to the way the data is stored rather then what it represents. It is up to the user to decide whether the information gets translated into Strings or any other objects. The conversion between the user (custom) types and raw data (and vice-versa) is handled in Spring Data Redis through the `RedisSerializer` interface (package `org.springframework.data.redis.serializer`) which as the name implies, takes care of the serialization process. Multiple implementations are available out of the box, two of which have been already mentioned before in this documentation: the `StringRedisSerializer` and the `JdkSerializationRedisSerializer`. However one can use `OxmSerializer` for Object/XML mapping through Spring 3 http://docs.spring.io/spring/docs/current/spring-framework-reference/html/oxm.html[OXM] support or either `JacksonJsonRedisSerializer`, `Jackson2JsonRedisSerializer` or `GenericJackson2JsonRedisSerializer for storing data in http://en.wikipedia.org/wiki/JSON[JSON] format. Do note that the storage format is not limited only to values - it can be used for keys, values or hashes without any restrictions.
+From the framework perspective, the data stored in Redis is just bytes. While Redis itself supports various types, for the most part these refer to the way the data is stored rather than what it represents. It is up to the user to decide whether the information gets translated into Strings or any other objects. The conversion between the user (custom) types and raw data (and vice-versa) is handled in Spring Data Redis through the `RedisSerializer` interface (package `org.springframework.data.redis.serializer`) which as the name implies, takes care of the serialization process. Multiple implementations are available out of the box, two of which have been already mentioned before in this documentation: the `StringRedisSerializer` and the `JdkSerializationRedisSerializer`. However one can use `OxmSerializer` for Object/XML mapping through Spring 3 http://docs.spring.io/spring/docs/current/spring-framework-reference/html/oxm.html[OXM] support or either `JacksonJsonRedisSerializer`, `Jackson2JsonRedisSerializer` or `GenericJackson2JsonRedisSerializer for storing data in http://en.wikipedia.org/wiki/JSON[JSON] format. Do note that the storage format is not limited only to values - it can be used for keys, values or hashes without any restrictions.
 
 :leveloffset: 2
 include::{referenceDir}/redis-messaging.adoc[]
@@ -427,8 +427,4 @@ NOTE: By default `RedisCacheManager` will not participate in any ongoing transac
 
 NOTE: By default `RedisCacheManager` does not prefix keys for cache regions, which can lead to an unexpected growth of a `ZSET` used to maintain known keys. It's highly recommended to enable the usage of prefixes in order to avoid this unexpected growth and potential key clashes using more than one cache region.
 
-[[redis:future]]
-== Roadmap ahead
-
-Spring Data Redis project is in its early stages. We are interested in feedback, knowing what your use cases are, what are the common patters you encounter so that the Redis module better serves your needs. Do contact us using the channels <<null,mentioned>> above, we are interested in hearing from you!
 
